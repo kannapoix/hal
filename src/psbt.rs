@@ -1,15 +1,25 @@
+use bitcoin::psbt::PsbtSighashType;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use bitcoin::blockdata::transaction::EcdsaSighashType;
 use bitcoin::util::{bip32, psbt};
-use bitcoin::{Network, SigHashType};
+use bitcoin::Network;
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct PsbtGlobalInfo {
 	pub unsigned_tx: ::tx::TransactionInfo,
 }
 
-impl ::GetInfo<PsbtGlobalInfo> for psbt::Global {
+// impl ::GetInfo<PsbtGlobalInfo> for psbt::Global {
+// 	fn get_info(&self, network: Network) -> PsbtGlobalInfo {
+// 		PsbtGlobalInfo {
+// 			unsigned_tx: self.unsigned_tx.get_info(network),
+// 		}
+// 	}
+// }
+
+impl ::GetInfo<PsbtGlobalInfo> for psbt::PartiallySignedTransaction {
 	fn get_info(&self, network: Network) -> PsbtGlobalInfo {
 		PsbtGlobalInfo {
 			unsigned_tx: self.unsigned_tx.get_info(network),
@@ -23,24 +33,26 @@ pub struct HDPathInfo {
 	pub path: bip32::DerivationPath,
 }
 
-pub fn sighashtype_to_string(sht: SigHashType) -> String {
-	use bitcoin::SigHashType::*;
-	match sht {
-		All => "ALL",
-		None => "NONE",
-		Single => "SINGLE",
-		AllPlusAnyoneCanPay => "ALL|ANYONECANPAY",
-		NonePlusAnyoneCanPay => "NONE|ANYONECANPAY",
-		SinglePlusAnyoneCanPay => "SINGLE|ANYONECANPAY",
-	}.to_owned()
+pub fn sighashtype_to_string(sht: PsbtSighashType) -> String {
+	sht.to_string()
+	// use bitcoin::EcdsaSighashType::*;
+	// match sht {
+	// 	All => "ALL",
+	// 	None => "NONE",
+	// 	Single => "SINGLE",
+	// 	AllPlusAnyoneCanPay => "ALL|ANYONECANPAY",
+	// 	NonePlusAnyoneCanPay => "NONE|ANYONECANPAY",
+	// 	SinglePlusAnyoneCanPay => "SINGLE|ANYONECANPAY",
+	// }
+	// .to_owned()
 }
 
 pub fn sighashtype_values() -> &'static [&'static str] {
 	&["ALL", "NONE", "SINGLE", "ALL|ANYONECANPAY", "NONE|ANYONECANPAY", "SINGLE|ANYONECANPAY"]
 }
 
-pub fn sighashtype_from_string(sht: &str) -> SigHashType {
-	use bitcoin::SigHashType::*;
+pub fn sighashtype_from_string(sht: &str) -> EcdsaSighashType {
+	use bitcoin::EcdsaSighashType::*;
 	match sht {
 		"ALL" => All,
 		"NONE" => None,
@@ -82,19 +94,24 @@ impl ::GetInfo<PsbtInputInfo> for psbt::Input {
 			partial_sigs: {
 				let mut partial_sigs = HashMap::new();
 				for (key, value) in self.partial_sigs.iter() {
-					partial_sigs.insert(key.to_bytes().into(), value.clone().into());
+					partial_sigs.insert(key.to_bytes().into(), value.to_vec().into());
 				}
 				partial_sigs
 			},
 			sighash_type: self.sighash_type.map(sighashtype_to_string),
-			redeem_script: self.redeem_script.as_ref()
+			redeem_script: self
+				.redeem_script
+				.as_ref()
 				.map(|s| ::tx::OutputScript(s).get_info(network)),
-			witness_script: self.witness_script.as_ref()
+			witness_script: self
+				.witness_script
+				.as_ref()
 				.map(|s| ::tx::OutputScript(s).get_info(network)),
 			hd_keypaths: {
 				let mut hd_keypaths = HashMap::new();
 				for (key, value) in self.bip32_derivation.iter() {
-					hd_keypaths.insert(key.to_bytes().into(),
+					hd_keypaths.insert(
+						key.serialize().to_vec().into(),
 						HDPathInfo {
 							master_fingerprint: value.0[..].into(),
 							path: value.1.clone(),
@@ -103,9 +120,13 @@ impl ::GetInfo<PsbtInputInfo> for psbt::Input {
 				}
 				hd_keypaths
 			},
-			final_script_sig: self.final_script_sig.as_ref()
+			final_script_sig: self
+				.final_script_sig
+				.as_ref()
 				.map(|s| ::tx::InputScript(s).get_info(network)),
-			final_script_witness: self.final_script_witness.as_ref()
+			final_script_witness: self
+				.final_script_witness
+				.as_ref()
 				.map(|w| w.iter().map(|p| p.clone().into()).collect()),
 		}
 	}
@@ -124,14 +145,19 @@ pub struct PsbtOutputInfo {
 impl ::GetInfo<PsbtOutputInfo> for psbt::Output {
 	fn get_info(&self, network: Network) -> PsbtOutputInfo {
 		PsbtOutputInfo {
-			redeem_script: self.redeem_script.as_ref()
+			redeem_script: self
+				.redeem_script
+				.as_ref()
 				.map(|s| ::tx::OutputScript(s).get_info(network)),
-			witness_script: self.witness_script.as_ref()
+			witness_script: self
+				.witness_script
+				.as_ref()
 				.map(|s| ::tx::OutputScript(s).get_info(network)),
 			hd_keypaths: {
 				let mut hd_keypaths = HashMap::new();
 				for (key, value) in self.bip32_derivation.iter() {
-					hd_keypaths.insert(key.to_bytes().into(),
+					hd_keypaths.insert(
+						key.serialize().to_vec().into(),
 						HDPathInfo {
 							master_fingerprint: value.0[..].into(),
 							path: value.1.clone(),
@@ -154,7 +180,7 @@ pub struct PsbtInfo {
 impl ::GetInfo<PsbtInfo> for psbt::PartiallySignedTransaction {
 	fn get_info(&self, network: Network) -> PsbtInfo {
 		PsbtInfo {
-			global: self.global.get_info(network),
+			global: self.get_info(network),
 			inputs: self.inputs.iter().map(|i| i.get_info(network)).collect(),
 			outputs: self.outputs.iter().map(|o| o.get_info(network)).collect(),
 		}

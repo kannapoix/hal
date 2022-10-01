@@ -1,6 +1,5 @@
-use bitcoin::bech32::u5;
 use bitcoin::hashes::{sha256, Hash};
-use bitcoin::util::address::Payload;
+use bitcoin::util::address::{Payload, WitnessVersion};
 use bitcoin::{Address, Network};
 use byteorder::{BigEndian, ByteOrder};
 use chrono::{offset::Local, DateTime, Duration};
@@ -121,7 +120,7 @@ impl ::GetInfo<InvoiceInfo> for Invoice {
 								version: v,
 								program: p,
 							} => Payload::WitnessProgram {
-								version: u5::try_from_u8(v.to_u8())
+								version: WitnessVersion::from_num(v.to_u8())
 									.expect("invalid segwit version"),
 								program: p.to_vec(),
 							},

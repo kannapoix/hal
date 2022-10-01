@@ -1,4 +1,6 @@
-use bitcoin::{Address, Network, PublicKey, Script, PubkeyHash, ScriptHash, WPubkeyHash, WScriptHash};
+use bitcoin::{
+	Address, Network, PubkeyHash, PublicKey, Script, ScriptHash, WPubkeyHash, WScriptHash,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
@@ -47,7 +49,7 @@ impl Addresses {
 
 	pub fn from_script(script: &Script, network: Network) -> Addresses {
 		Addresses {
-			p2sh: Some(Address::p2sh(&script, network)),
+			p2sh: Address::p2sh(&script, network).ok(),
 			p2wsh: Some(Address::p2wsh(&script, network)),
 			p2shwsh: Some(Address::p2shwsh(&script, network)),
 			..Default::default()
